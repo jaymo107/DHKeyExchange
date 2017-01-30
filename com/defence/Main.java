@@ -2,12 +2,21 @@ package com.defence;
 
 import com.sun.deploy.util.StringUtils;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
 import java.net.*;
 import java.io.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Random;
 
 import static java.awt.SystemColor.text;
@@ -15,14 +24,15 @@ import static java.awt.SystemColor.text;
 public class Main {
 
     private Random random;
+    private String iv;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException {
 
         new Main().initialise(args);
 
     }
 
-    private void initialise(String[] args) throws IOException {
+    private void initialise(String[] args) throws IOException, NoSuchAlgorithmException, NoSuchPaddingException, BadPaddingException, InvalidKeyException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
 
         // Grab the values from the parameters
         BigInteger p = BigInteger.valueOf(Long.parseLong(args[0]));
@@ -41,7 +51,16 @@ public class Main {
             PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
 
             BigInteger key = generateDHSharedkey(g, a, p, out, in);
-            createSessionKey(key);
+            String sessionKey = createSessionKey(key);
+
+            System.out.println(sessionKey);
+
+            // Send the session key
+            out.println("##NONCE##" + sessionKey + "####");
+
+            String file = requestEncryptedFile(out, in, sessionKey);
+
+            System.out.println(file);
 
         } catch (SocketException e) {
             System.out.println("Server closed connection");
@@ -73,7 +92,7 @@ public class Main {
         return key;
     }
 
-    private void createSessionKey(BigInteger dhKey) {
+    private String createSessionKey(BigInteger dhKey) {
 
         int padAmount = 12;
 
@@ -87,6 +106,8 @@ public class Main {
         // Prepend the random number to the beginning of the key
         String newKey = String.valueOf(R) + paddedKey;
         System.out.println("Concatenated key: " + newKey);
+
+        this.iv = newKey;
 
         MessageDigest digest = null;
 
@@ -106,13 +127,43 @@ public class Main {
                 hexString.append(hex);
             }
 
-            System.out.println("Hash: " + hexString.toString());
+            System.out.println("Hash: " + hexString.substring(0, 16));
+            return hexString.substring(0, 16);
 
         } catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
             e.printStackTrace();
         }
 
+        return "";
     }
 
+    private String requestEncryptedFile(PrintWriter out, BufferedReader in, String key) throws IOException, NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+        // Request a file
+        out.println("##REQFILE####");
+
+        String response = in.readLine();
+
+        System.out.println("File response: " + response);
+
+        String fileContents = response.substring(11, response.indexOf("####"));
+        System.out.println("File contents: " + fileContents);
+
+        System.out.println("IV should be 16 characters long, actual is: " + this.iv.length());
+
+        IvParameterSpec iv = new IvParameterSpec(this.iv.getBytes("UTF-8"));
+        SecretKeySpec skeySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);
+
+        byte[] original = cipher.doFinal(Base64.getDecoder().decode(fileContents));
+
+        //return new String(original);
+
+        //byte[] original = cipher.doFinal(decoded);
+        return "";
+        //return new String(original);
+
+    }
 
 }
