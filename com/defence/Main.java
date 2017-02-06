@@ -159,8 +159,8 @@ public class Main {
         // Decrypt the data
         byte[] data = decrypt(fileContents, iv, sessionKey);
 
-        // Decrypt the data
-        return new String(data);
+        // Decrypt the data and parse it, to remove the 'DECRYPTED' beginning
+        return parseMessage(new String(data));
     }
 
     /**
@@ -179,6 +179,17 @@ public class Main {
         byte[] decoded = Base64.getDecoder().decode(encrypted);
 
         return cipher.doFinal(decoded);
+    }
+
+    /**
+     * Remove the 'DECRYPTED:' message from the beginning of the output.
+     *
+     * @param message
+     * @return
+     */
+    private String parseMessage(String message) {
+        // Only replace the first occurrence
+        return message.replaceFirst("DECRYPTED:", "");
     }
 
 }
