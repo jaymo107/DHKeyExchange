@@ -12,6 +12,8 @@ import java.util.Base64;
 
 public class Main {
 
+    private MessageDigest digest;
+
     public static void main(String[] args) throws Exception {
 
         // Pass the arguments to the initialise
@@ -41,7 +43,7 @@ public class Main {
             String nonce = createNonce();
 
             // Create the diffe helman shared key
-            BigInteger key = generateDHSharedkey(g, a, p, out, in);
+            BigInteger key = createDHkey(g, a, p, out, in);
 
             // Create the IV
             String iv = createIv(key, nonce);
@@ -54,7 +56,13 @@ public class Main {
 
             String file = requestEncryptedFile(out, in, iv, sessionKey);
 
-            System.out.println(file);
+            System.out.println("Decrypted Output: " + file);
+
+            if (verifyMessage(file, out, in, iv, sessionKey)) {
+                System.out.println("Verified successfully.");
+            } else {
+                System.out.println("Couldn't verify this.");
+            }
 
         } catch (SocketException e) {
             System.out.println("Server closed connection");
@@ -73,7 +81,7 @@ public class Main {
      * @return
      * @throws Exception
      */
-    private BigInteger generateDHSharedkey(BigInteger g, BigInteger a, BigInteger p, PrintWriter out, BufferedReader in) throws Exception {
+    private BigInteger createDHkey(BigInteger g, BigInteger a, BigInteger p, PrintWriter out, BufferedReader in) throws Exception {
 
         // Create A to send to the server
         String A = "##DHA##" + (g.pow(a.intValue()).mod(p)).toString() + "####";
@@ -104,7 +112,7 @@ public class Main {
     }
 
     /**
-     * Create the IV consistint of the diffeHelman and nonce key padded using 12 0's
+     * Create the IV consistent of the DiffeHellman and nonce key padded using 12 0's
      *
      * @param dhKey
      * @param R
@@ -129,7 +137,7 @@ public class Main {
      */
     private byte[] createSessionKey(String concatenatedKey) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest = MessageDigest.getInstance("SHA-256");
             byte[] hashed = digest.digest(concatenatedKey.getBytes("UTF-8"));
 
             // Return first 16 bytes
@@ -144,6 +152,8 @@ public class Main {
 
 
     /**
+     * Request the file from the server
+     *
      * @param out
      * @param in
      * @return
@@ -179,6 +189,55 @@ public class Main {
         byte[] decoded = Base64.getDecoder().decode(encrypted);
 
         return cipher.doFinal(decoded);
+    }
+
+    /**
+     * @param hash The hash to encrypt
+     * @return byte[]   The encrypted bytes
+     * @throws Exception
+     */
+    private String encrypt(byte[] hash, String iv, byte[] sessionKey) throws Exception {
+
+        IvParameterSpec ivSpec = new IvParameterSpec(iv.getBytes());
+        SecretKeySpec skeySpec = new SecretKeySpec(sessionKey, "AES");
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
+
+        // Set to encrypt mode
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec, ivSpec);
+
+        // Encrypt the original message
+        byte[] encrypted = cipher.doFinal(hash);
+
+        // Base64 encode the message
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    /**
+     * Verify the current message, re-encrypt the message, send it to the server
+     * and await verification message.
+     *
+     * @param message
+     * @param out
+     * @param in
+     * @return
+     */
+    private boolean verifyMessage(String message, PrintWriter out, BufferedReader in, String iv, byte[] sessionKey) throws Exception {
+
+        // Calculate the 256 hash
+        byte[] hashedMessage = digest.digest(message.getBytes("UTF-8"));
+
+        // Encrypt the message
+        String encryptedMessage = encrypt(hashedMessage, iv, sessionKey);
+
+        // Send the message to be verified by the server
+        out.println("##VERIFY##" + encryptedMessage + "####");
+
+        // Store the response
+        String response = in.readLine();
+        out.flush();
+
+        return (response.equals("##VERIFIED####"));
     }
 
     /**
