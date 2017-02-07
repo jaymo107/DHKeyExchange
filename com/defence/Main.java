@@ -54,10 +54,13 @@ public class Main {
             out.println("##NONCE##" + nonce + "####");
             out.flush();
 
+            // Store the contents of the file
             String file = requestEncryptedFile(out, in, iv, sessionKey);
 
             System.out.println("Decrypted Output: " + file);
 
+            // Check that the message is valid, hash it and send it back to the server for
+            // checking.
             if (verifyMessage(file, out, in, iv, sessionKey)) {
                 System.out.println("Verified successfully.");
             } else {
@@ -237,6 +240,7 @@ public class Main {
         String response = in.readLine();
         out.flush();
 
+        // Return wether the response is verified or not
         return (response.equals("##VERIFIED####"));
     }
 
