@@ -17,11 +17,11 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         // Pass the arguments to the initialise
-        new Main().initialise(args[0], args[1], args[2]);
+        new Main().initialise(args[1], args[2], args[3], args[0]);
 
     }
 
-    private void initialise(String input1, String input2, String input3) throws Exception {
+    private void initialise(String input1, String input2, String input3, String port) throws Exception {
 
         // Grab the values from the parameters
         BigInteger p = new BigInteger(input1);
@@ -32,7 +32,7 @@ public class Main {
         InetAddress addr = InetAddress.getByName("127.0.0.1");
 
         // Port of the server to connect to
-        Socket socket = new Socket(addr, 8080);
+        Socket socket = new Socket(addr, Integer.valueOf(port));
 
         try {
             System.out.println("socket = " + socket);
@@ -66,6 +66,9 @@ public class Main {
             } else {
                 System.out.println("Couldn't verify this.");
             }
+
+            // End the transmission
+            out.println("END");
 
         } catch (SocketException e) {
             System.out.println("Server closed connection");
