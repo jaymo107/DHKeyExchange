@@ -17,11 +17,11 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         // Pass the arguments to the initialise
-        new Main().initialise(args[1], args[2], args[3], args[0]);
+        new Main().initialise(args[0], args[1], args[2], args[3], args[4]);
 
     }
 
-    private void initialise(String input1, String input2, String input3, String port) throws Exception {
+    private void initialise(String ip, String port, String input1, String input2, String input3) throws Exception {
 
         // Grab the values from the parameters
         BigInteger p = new BigInteger(input1);
@@ -29,7 +29,7 @@ public class Main {
         BigInteger a = new BigInteger(input3);
 
         // Specify the IP address of the server
-        InetAddress addr = InetAddress.getByName("127.0.0.1");
+        InetAddress addr = InetAddress.getByName(ip);
 
         // Port of the server to connect to
         Socket socket = new Socket(addr, Integer.valueOf(port));
@@ -242,6 +242,8 @@ public class Main {
         // Store the response
         String response = in.readLine();
         out.flush();
+
+        System.out.println("Server response: " + response);
 
         // Return wether the response is verified or not
         return (response.equals("##VERIFIED####"));
